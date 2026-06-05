@@ -1,4 +1,4 @@
-package com.example.vball_scorekeeper
+package com.jkong27.vball_scorekeeper
 
 import io.flutter.embedding.android.FlutterActivity
 
