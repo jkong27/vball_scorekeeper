@@ -1,111 +1,84 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(VolleyballScorekeeperApp());
+  runApp(const VolleyballScorekeeperApp());
 }
 
 class VolleyballScorekeeperApp extends StatelessWidget {
+  const VolleyballScorekeeperApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Volleyball Scorekeeper',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: ScoreKeeperPage(),
+      debugShowCheckedModeBanner: false,
+      home: const ScoreboardPage(),
     );
   }
 }
 
-class MatchState {
-  int teamAScore;
-  int teamBScore;
-  int teamASets;
-  int teamBSets;
-  bool isTeamAServing;
+class ScoreboardPage extends StatefulWidget {
+  const ScoreboardPage({super.key});
 
-  MatchState({
-    required this.teamAScore,
-    required this.teamBScore,
-    required this.teamASets,
-    required this.teamBSets,
-    required this.isTeamAServing,
-  });
-
-  // Clone for history
-  MatchState copy() => MatchState(
-    teamAScore: teamAScore,
-    teamBScore: teamBScore,
-    teamASets: teamASets,
-    teamBSets: teamBSets,
-    isTeamAServing: isTeamAServing,
-  );
-}
-
-class ScoreKeeperPage extends StatefulWidget {
-  @override
-  _ScoreKeeperPageState createState() => _ScoreKeeperPageState();
-}
-
-class _ScoreKeeperPageState extends State<ScoreKeeperPage> {
-  late MatchState state;
-  final List<MatchState> history = [];
+  static const Color teamBlue = Color(0xFF186CF2);
+  static const Color teamRed = Color(0xFFED244C);
 
   @override
-  void initState() {
-    super.initState();
-    state = MatchState(
-      teamAScore: 0,
-      teamBScore: 0,
-      teamASets: 0,
-      teamBSets: 0,
-      isTeamAServing: true,
+  State<ScoreboardPage> createState() => _ScoreboardPageState();
+}
+
+class _ScoreboardPageState extends State<ScoreboardPage> {
+  int blueScore = 0;
+  int redScore = 0;
+
+  void _resetScores() {
+    setState(() {
+      blueScore = 0;
+      redScore = 0;
+    });
+  }
+
+  Future<void> _confirmReset(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset scores?'),
+        content: const Text('Both teams will return to 00.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed == true && mounted) {
+      _resetScores();
+    }
   }
 
-  void saveState() {
-    history.add(state.copy());
-  }
+  void _handleTap(Offset position, BoxConstraints constraints) {
+    final isBlueSide = position.dx < constraints.maxWidth / 2;
+    final isAboveOverlay = position.dy < constraints.maxHeight * 2 / 3;
 
-  void addPoint(bool teamA) {
     setState(() {
-      saveState();
-      if (teamA) {
-        state.teamAScore++;
-        state.isTeamAServing = true;
+      if (isAboveOverlay) {
+        if (isBlueSide) {
+          blueScore++;
+        } else {
+          redScore++;
+        }
       } else {
-        state.teamBScore++;
-        state.isTeamAServing = false;
-      }
-    });
-  }
-
-  void undo() {
-    setState(() {
-      if (history.isNotEmpty) {
-        state = history.removeLast();
-      }
-    });
-  }
-
-  void resetMatch() {
-    setState(() {
-      state = MatchState(
-        teamAScore: 0,
-        teamBScore: 0,
-        teamASets: 0,
-        teamBSets: 0,
-        isTeamAServing: true,
-      );
-      history.clear();
-    });
-  }
-
-  void addSet(bool teamA) {
-    setState(() {
-      saveState();
-      if (teamA) {
-        state.teamASets++;
-      } else {
-        state.teamBSets++;
+        if (isBlueSide) {
+          blueScore = blueScore > 0 ? blueScore - 1 : 0;
+        } else {
+          redScore = redScore > 0 ? redScore - 1 : 0;
+        }
       }
     });
   }
@@ -113,70 +86,90 @@ class _ScoreKeeperPageState extends State<ScoreKeeperPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Volleyball Scorekeeper'),
-        actions: [IconButton(icon: Icon(Icons.refresh), onPressed: resetMatch)],
-      ),
-      body: Row(
-        children: [
-          _teamColumn(
-            'Team A',
-            state.teamAScore,
-            state.teamASets,
-            true,
-            Colors.blue,
-          ),
-          _teamColumn(
-            'Team B',
-            state.teamBScore,
-            state.teamBSets,
-            false,
-            Colors.red,
-          ),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              Row(
+                children: [
+                  _teamSide(ScoreboardPage.teamBlue, blueScore),
+                  _teamSide(ScoreboardPage.teamRed, redScore),
+                ],
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: constraints.maxHeight / 3,
+                child: IgnorePointer(
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.2),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (details) =>
+                      _handleTap(details.localPosition, constraints),
+                ),
+              ),
+              Positioned(
+                left: constraints.maxWidth * 5 / 6,
+                width: constraints.maxWidth / 6,
+                bottom: 0,
+                height: constraints.maxHeight / 3,
+                child: TextButton(
+                  onPressed: () => _confirmReset(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size(
+                      constraints.maxWidth / 6,
+                      constraints.maxHeight / 3,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                    shape: const RoundedRectangleBorder(),
+                  ),
+                  child: const Text(
+                    'RESET',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Expanded _teamColumn(
-    String name,
-    int score,
-    int sets,
-    bool teamA,
-    Color color,
-  ) {
+  Widget _teamSide(Color color, int score) {
     return Expanded(
-      child: GestureDetector(
-        onTap: () => addPoint(teamA),
-        onVerticalDragUpdate: (details) {
-          if (details.delta.dy > 10) {
-            // Swiping down
-            undo();
-          }
-        },
-        child: Container(
-          color: color.withOpacity(0.2),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(name, style: TextStyle(fontSize: 28)),
-              SizedBox(height: 20),
-              Text('$score', style: TextStyle(fontSize: 80)),
-              SizedBox(height: 20),
-              Text('Sets: $sets', style: TextStyle(fontSize: 24)),
-              SizedBox(height: 20),
-              if ((teamA && state.isTeamAServing) ||
-                  (!teamA && !state.isTeamAServing))
-                Icon(Icons.sports_volleyball, size: 40, color: Colors.orange),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => addSet(teamA),
-                child: Text('Add Set'),
+      child: Container(
+        color: color,
+        padding: const EdgeInsets.all(12),
+        alignment: Alignment.center,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest.shortestSide * 0.85;
+            return Text(
+              score.toString().padLeft(2, '0'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                height: 1,
+                fontSize: size,
               ),
-              SizedBox(height: 10),
-              Text('Swipe down to undo', style: TextStyle(fontSize: 14)),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
